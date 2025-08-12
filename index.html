@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chipotle Burrito Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 30px;
+      background-color: #f7f3ed;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 16px;
+    }
+    #result {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+    #note {
+      font-size: 12px;
+      color: #555;
+      margin-top: 8px;
+    }
+  </style>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-M7HHGRMRZP"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-M7HHGRMRZP');
+  </script>
+</head>
+<body>
+  <h1>🌯 Chipotle Burrito Calculator</h1>
+  <p>Enter how much money you have:</p>
+  
+  <input type="number" id="amount" placeholder="Enter amount in $" step="0.01">
+  <button onclick="calculateBurritos()">Calculate</button>
+  
+  <div id="result"></div>
+  <div id="note">*Using $10.90 as the national average burrito price (August 2025)</div>
+  
+  <script>
+    const burritoPrice = 10.90;
+    
+    function calculateBurritos() {
+      const amount = parseFloat(document.getElementById('amount').value);
+      const burritos = Math.floor(amount / burritoPrice);
+      const leftover = (amount % burritoPrice).toFixed(2);
+      
+      if (isNaN(amount) || amount <= 0) {
+        document.getElementById('result').textContent = "Please enter a valid amount.";
+        return;
+      }
+      
+      document.getElementById('result').textContent = 
+        `You can get ${burritos} burrito${burritos !== 1 ? 's' : ''} and will have $${leftover} left over.`;
+    }
+  </script>
+</body>
+</html>
