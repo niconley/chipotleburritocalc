@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chipotle Burrito Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 30px;
+      background-color: #f7f3ed;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 16px;
+    }
+    #result {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+    #note {
+      font-size: 12px;
+      color: #555;
+      margin-top: 8px;
+    }
+    /* Inflation tracker styles */
+    #inflation {
+      margin-top: 32px;
+      text-align: left;
+      display: none; /* stays hidden until first valid calc */
+      background: #fff;
+      padding: 16px 20px;
+      border-radius: 10px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+    }
+    #inflation h2 {
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 320px;
+    }
+    th, td {
+      border-bottom: 1px solid #eee;
+      padding: 8px 6px;
+      text-align: right;
+      font-size: 14px;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    small.muted { color:#666; font-size:12px; }
+    canvas { margin-top: 12px; }
+    /* Tiny test results area (hidden) */
+    #test-results { display:none; font-size:12px; color:#333; text-align:left; margin:14px auto; max-width:640px; }
+  </style>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-M7HHGRMRZP"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    gtag('js', new Date());
+    gtag('config', 'G-M7HHGRMRZP');
+  </script>
+</head>
+<body>
+  <h1>🌯 Chipotle Burrito Calculator</h1>
+  <p>Enter how much money you have:</p>
+  
+  <input type="text" id="amount" placeholder="$0.00">
+  <button onclick="calculateBurritos()">Calculate</button>
+  
+  <div id="result"></div>
+  <div id="note">*Using $10.90 as the national average burrito price (August 2025)</div>
+
+  <div id="inflation">
+    <h2>Inflation Tracker</h2>
+    <small class="muted">How many burritos this amount could buy in past years</small>
+    <table>
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Avg Price</th>
+          <th>Burritos</th>
+        </tr>
+      </thead>
+      <tbody id="inflation-body">
+        <tr><td>2005</td><td>$5.50</td><td>—</td></tr>
+        <tr><td>2010</td><td>$5.90</td><td>—</td></tr>
+        <tr><td>2015</td><td>$6.50</td><td>—</td></tr>
+        <tr><td>2020</td><td>$7.25</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <canvas id="inflationChart" width="320" height="100"></canvas>
+  </div>
+
+  <div id="test-results"></div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const burritoPrice = 10.90; // 2025 average
+
+    const pastPrices = {
+      2005: 5.50,
+      2010: 5.90,
+      2015: 6.50,
+      2020: 7.25,
+    };
+
+    // ------ Input formatting: add $ and commas while typing ------
+    const amountInput = document.getElementById('amount');
+    amountInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/[^0-9.]/g, '');
+      if (value) {
+        let parts = value.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        e.target.value = '$' + parts.join('.');
+      } else {
+        e.target.value = '';
+      }
+    });
+
+    function formatInt(n){
+      try { return Number(n).toLocaleString('en-US'); } catch { return String(n); }
+    }
+
+    function calculateBurritos() {
+      let rawValue = amountInput.value.replace(/[^0-9.]/g, '');
+      const amount = parseFloat(rawValue);
+      const burritos = Math.floor(amount / burritoPrice);
+      const leftover = (amount % burritoPrice).toFixed(2);
+
+      // Track button click in Google Analytics
+      gtag('event', 'calculate_click', {
+        'event_category': 'Burrito Calculator',
+        'event_label': 'Calculate button clicked',
+        'value': amount
+      });
+      
+      if (isNaN(amount) || amount <= 0) {
+        document.getElementById('result').textContent = "Please enter a valid amount.";
+        document.getElementById('inflation').style.display = 'none';
+        destroyChartSafely();
+        return;
+      }
+      
+      document.getElementById('result').textContent = 
+        `You can get ${formatInt(burritos)} burrito${burritos !== 1 ? 's' : ''} and will have $${leftover} left over.`;
+
+      updateInflation(amount);
+      document.getElementById('inflation').style.display = 'inline-block';
+    }
+
+    function updateInflation(amount){
+      const tbody = document.getElementById('inflation-body');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const counts = [];
+      const labels = [];
+      rows.forEach(row => {
+        const year = row.children[0].textContent.trim();
+        const price = pastPrices[year];
+        const cell = row.children[2];
+        labels.push(year);
+        if (!amount || isNaN(amount)) {
+          cell.textContent = '—';
+          counts.push(null);
+        } else {
+          const count = Math.floor(amount / price);
+          cell.textContent = formatInt(count);
+          counts.push(count);
+        }
+      });
+      drawChart(labels, counts);
+    }
+
+    // ---- Chart helpers ----
+    function destroyChartSafely(){
+      // Use a different global name than the canvas id to avoid collisions with DOM globals.
+      if (window.inflationChartInstance && typeof window.inflationChartInstance.destroy === 'function') {
+        window.inflationChartInstance.destroy();
+      }
+      // Always reset to null to keep the type predictable
+      window.inflationChartInstance = null;
+    }
+
+    function drawChart(labels, data) {
+      // If Chart.js didn't load, silently skip drawing to avoid breaking the page
+      if (typeof Chart === 'undefined') return;
+      const canvas = document.getElementById('inflationChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      destroyChartSafely();
+      window.inflationChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Burritos Over Time',
+            data: data,
+            borderColor: '#d35400',
+            backgroundColor: 'rgba(211, 84, 0, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+
+    // ---- Minimal inline tests (non-intrusive) ----
+    (function runTests(){
+      const results = [];
+      function ok(name, fn){
+        try { fn(); results.push(`✅ ${name}`); }
+        catch(e){ console.error(name, e); results.push(`❌ ${name}: ${e && e.message}`); }
+      }
+      
+      ok('destroyChartSafely on undefined instance does not throw', () => {
+        // ensure undefined state
+        window.inflationChartInstance = undefined;
+        destroyChartSafely();
+      });
+
+      ok('formatInt adds commas', () => {
+        const out = formatInt(1234567);
+        if (out !== '1,234,567') throw new Error(`Expected 1,234,567, got ${out}`);
+      });
+
+      ok('parsing $ and commas yields correct number', () => {
+        const raw = '$1,234.56'.replace(/[^0-9.]/g, '');
+        const num = parseFloat(raw);
+        if (num !== 1234.56) throw new Error(`Expected 1234.56, got ${num}`);
+      });
+
+      const el = document.getElementById('test-results');
+      if (el) el.textContent = results.join('\n');
+      // Also log to console for devs
+      if (results.some(r => r.startsWith('❌'))) {
+        console.warn('Some tests failed. Open #test-results for details.');
+      } else {
+        console.log('All inline tests passed.');
+      }
+    })();
+  </script>
+</body>
+</html>
